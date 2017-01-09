@@ -70,19 +70,120 @@ colnames(pw.exp) <- genes
 ################################################################################
 
 #obtain spls coefficients
-beta <- spls.coeff(tf.exp,pw.exp)
+#beta <- spls.coeff(tf.exp,pw.exp)
 
 #t-statisic for spls coefficients
 #boot.tstat <- coeff.boot(tf.exp,pw.exp)
 
-Selected_TF<-data.frame(sort(table(unlist(beta[1:150,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
-Selected_TF<-data.frame(test[test[,2]>2,])
-
-
+#Selected_TF<-data.frame(sort(table(unlist(beta[1:150,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
+#Selected_TF<-data.frame(test[test[,2]>2,])
+#Selected_TF <- rownames(Selected_TF)
+#commnet this line to used Dimention reduciton
+Selected_TF <- colnames(tf.exp)
 
 ################################################################################
 #CMI calculations
 ################################################################################
+
+count_i <-0
+  for(i in 1:(dim(pw.exp)[2]-1)){
+    for(j in (i+1):(dim(pw.exp)[2])){
+      for(k in Selected_TF){
+      #for(k in j:10){ #comment this for server
+        count_i <-count_i + 1
+        print(count_i)
+        y1 <- pw.exp[,i]
+        y2 <- pw.exp[,j]
+        x <- tf.exp[[k]]
+        #Mutual Information
+        y1 <- discretize(y1)
+        y2 <- discretize(y2)
+        x <- discretize(x)
+        
+        enty1 <- entropy(y1)
+        if(enty1==0) next
+        enty2 <- entropy(y2)
+        if(enty2==0) next
+        entx <- entropy(x)
+        if(entx==0) next
+        
+        enty1x <- condentropy(y1,x, method="emp")
+        if(enty1x==0) next
+        
+        enty2x <- condentropy(y2,x, method="emp")
+        if(enty2x==0) next
+        
+        enty1_y2x <- condentropy(y1,data.frame(x,y2), method="emp")
+        if(enty1_y2x==0) next
+        
+        enty2_y1x <- condentropy(y2,data.frame(x,y1), method="emp")
+        if(enty2_y1x==0) next
+        
+        entx_y1y2 <- condentropy(x,data.frame(y2,y1), method="emp")
+        if(entx_y1y2==0) next
+       
+        #calculates MI y1;y2
+        Iy1y2 <- condinformation(y1, y2, method="emp")
+        if(Iy1y2==0) next
+
+        #calculates pvalue for MI y1;y2
+        Iy1y2_pval <- 2*pnorm(-abs(cmi.pw(y1,y2)$zvalue))
+        
+        #calculates MI y1;y2|x
+        Iy1y2_x <- condinformation(y1, y2,x, method="emp")
+        if(Iy1y2_x==0) next
+        
+        Iy1x_y2<- condinformation(y1,x,y2, method="emp")
+        if(Iy1x_y2==0) next
+        
+        Iy2x_y1 <- condinformation(y2,x,y1, method="emp")
+        if(Iy2x_y1==0) next
+        
+        Iy1y2x <- Iy1y2 - Iy1y2_x 
+        if(Iy1y2x <= 0) next
+        
+        print(paste(c(colnames(pw.exp)[i],
+                    colnames(pw.exp)[j],
+                    k,
+                    enty1,
+                    enty2,
+                    entx,
+                    enty1_y2x,
+                    enty2_y1x,
+                    entx_y1y2,
+                    Iy1x_y2,
+                    Iy2x_y1,
+                    Iy1y2_x,
+                    Iy1y2,
+                    Iy1y2_pval,
+                    Iy1y2x),
+                    sep = ","
+        ))
+        
+        cat(
+          	colnames(pw.exp)[i],
+          	colnames(pw.exp)[j],
+          	k,
+	        enty1,
+	        enty2,
+	        entx,
+	        enty1_y2x,
+	        enty2_y1x,
+	        entx_y1y2,
+	        Iy1x_y2,
+	        Iy2x_y1,
+	        Iy1y2_x,
+	        Iy1y2,
+	        Iy1y2_pval,
+	        Iy1y2x,
+          "\n",
+          file="./all_combination_calculations.txt",
+          sep="\t",
+          append=TRUE)
+      }
+    }
+  }
+
 
 
 
