@@ -66,6 +66,49 @@ colnames(pw.exp) <- genes
 
 
 ################################################################################
-#Dimension Reduction Step
+#Dimension Reduction Step (Optional)
 ################################################################################
+
+#obtain spls coefficients
+beta <- spls.coeff(tf.exp,pw.exp)
+
+#t-statisic for spls coefficients
+#boot.tstat <- coeff.boot(tf.exp,pw.exp)
+
+Selected_TF<-data.frame(sort(table(unlist(beta[1:150,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
+Selected_TF<-data.frame(test[test[,2]>2,])
+
+
+
+################################################################################
+#CMI calculations
+################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
