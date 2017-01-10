@@ -7,6 +7,8 @@ library(mpmi)
 source("./load_background_data.R")
 source("./analyse_functions.R")
 
+alpha = 0.05
+
 ################################################################################
 #Load Data and convert to data frames as samples in rows and genes in columns
 ################################################################################
@@ -184,9 +186,40 @@ count_i <-0
     }
   }
 
+####### replace the file from the server ###############
+results <- read.csv("./SPLS_combination_calculations_stem_lignin_pw.txt",sep="\t",header = F)
+########################################################
+#correction for p_value for Iy1_y2_pval
 
+corrected.p.value<-p.adjust(results$V14, method = "BH", n = length(results$V14))
+results$V16 <- corrected.p.value
+colnames(results)<-c("Y1","Y2","X","H_Y1","H_Y2","H_X",
+                     "S1","S2","S3","S4","S5","S6","S6_S7","S6_S7_pval","S7","S6_S7_adj.pval")
 
+colnames(results)
 
+results$S7_div_sum_1_2_3 <- results$S7/(results$S1+results$S2+results$S3)
+hist(results$S7_div_sum_1_2_3)
+fit<-fitdist(results$S7_div_sum_1_2_3,"exp",method = c("mle"))
+plot(fit)
+summary(fit)[1]
+crit_S7_div_sum_1_2_3<-qexp(0.95,summary(fit)[1]$estimate)
+
+results$S4_div_sum_1_4_6_7 <- results$S4/(results$S1+results$S4+results$S6+results$S7)
+hist(results$S4_div_sum_1_4_6_7)
+fit<-fitdist(results$S4_div_sum_1_4_6_7,"lnorm",method = c("mle"))
+plot(fit)
+summary(fit)[1]
+#crit_S4_div_sum_1_4_6_7 <- qnorm(0.95,mean = summary(fit)[1]$estimate[1],sd=summary(fit)[1]$estimate[2],lower.tail = T)
+crit_S4_div_sum_1_4_6_7 <- qlnorm(0.95,meanlog = summary(fit)[1]$estimate[1],sdlog=summary(fit)[1]$estimate[2],lower.tail = T)
+
+results$S5_div_sum_2_5_6_7 <- results$S5/(results$S2+results$S5+results$S6+results$S7)
+hist(results$S5_div_sum_2_5_6_7)
+fit<-fitdist(results$S5_div_sum_2_5_6_7,"lnorm",method = c("mle"))
+plot(fit)
+summary(fit)[1]
+#crit_S5_div_sum_2_5_6_7 <- qnorm(0.95,mean = summary(fit)[1]$estimate[1],sd=summary(fit)[1]$estimate[2],lower.tail = T)
+crit_S5_div_sum_2_5_6_7 <- qlnorm(0.95,meanlog = summary(fit)[1]$estimate[1],sdlog=summary(fit)[1]$estimate[2],lower.tail = T)
 
 
 
