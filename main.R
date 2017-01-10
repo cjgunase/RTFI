@@ -7,7 +7,7 @@ library(mpmi)
 source("./load_background_data.R")
 source("./analyse_functions.R")
 
-alpha = 0.05
+y1_y2_pair_alpha = 0.005
 
 ################################################################################
 #Load Data and convert to data frames as samples in rows and genes in columns
@@ -205,7 +205,7 @@ plot(fit)
 summary(fit)[1]
 crit_S7_div_sum_1_2_3<-qexp(0.95,summary(fit)[1]$estimate)
 
-results$S4_div_sum_1_4_6_7 <- results$S4/(results$S1+results$S4+results$S6+results$S7)
+results$S4_div_sum_1_4_6_7 <- (results$S4+results$S7)/(results$S1+results$S4+results$S6+results$S7)
 hist(results$S4_div_sum_1_4_6_7)
 fit<-fitdist(results$S4_div_sum_1_4_6_7,"lnorm",method = c("mle"))
 plot(fit)
@@ -213,7 +213,7 @@ summary(fit)[1]
 #crit_S4_div_sum_1_4_6_7 <- qnorm(0.95,mean = summary(fit)[1]$estimate[1],sd=summary(fit)[1]$estimate[2],lower.tail = T)
 crit_S4_div_sum_1_4_6_7 <- qlnorm(0.95,meanlog = summary(fit)[1]$estimate[1],sdlog=summary(fit)[1]$estimate[2],lower.tail = T)
 
-results$S5_div_sum_2_5_6_7 <- results$S5/(results$S2+results$S5+results$S6+results$S7)
+results$S5_div_sum_2_5_6_7 <- (results$S5+results$S7)/(results$S2+results$S5+results$S6+results$S7)
 hist(results$S5_div_sum_2_5_6_7)
 fit<-fitdist(results$S5_div_sum_2_5_6_7,"lnorm",method = c("mle"))
 plot(fit)
@@ -223,20 +223,80 @@ crit_S5_div_sum_2_5_6_7 <- qlnorm(0.95,meanlog = summary(fit)[1]$estimate[1],sdl
 
 
 
+triple_ids <-c()
+pair_list<- create_empty_table(0,3)
+colnames(pair_list)<-c("pw","tf","str")
 
 
+for(i in 1:dim(results)[1]){
+  
+  row <- results[i,]
+  if(row$S6_S7_adj.pval < y1_y2_pair_alpha & row$S7_div_sum_1_2_3 < crit_S7_div_sum_1_2_3){
+    
+    if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 < crit_S5_div_sum_2_5_6_7){
+      # S4 sig -> pair
+      
+      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y1),tf=as.character(row$X),str=row$S4_div_sum_1_4_6_7))
+      
+    }else if(row$S4_div_sum_1_4_6_7 < crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
+      #S5 sig -> pair
+      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y2),tf=as.character(row$X),str=row$S5_div_sum_2_5_6_7  ))
+      
+    }else if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
+      #S4 and S5 sig -> triple
+      triple_ids <- c(triple_ids,i)
+    }else{
+      # both not sig -> discard
+      print("discard this triple gene combination")
+    }
 
+  }else if(row$S6_S7_adj.pval > y1_y2_pair_alpha){# 4 cases
+    
+    if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 < crit_S5_div_sum_2_5_6_7){
+      # S4 sig -> pair
+      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y1),tf=as.character(row$X),str=row$S4_div_sum_1_4_6_7  ))
+      
+    }else if(row$S4_div_sum_1_4_6_7 < crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
+      #S5 sig -> pair
+      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y2),tf=as.character(row$X),str=row$S5_div_sum_2_5_6_7  ))
+      
+    }else if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
+      #S4 and S5 sig -> triple
+      triple_ids <- c(triple_ids,i)
+    }else{
+      # both not sig -> discard
+      print("discard this triple gene combination")
+    }
+    
+  }else if(row$S6_S7_adj.pval < y1_y2_pair_alpha & row$S7_div_sum_1_2_3 > crit_S7_div_sum_1_2_3){
+    triple_ids <- c(triple_ids,i)
+    if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 < crit_S5_div_sum_2_5_6_7){
+      #S4 sig -> pair
+      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y1),tf=as.character(row$X),str=row$S4_div_sum_1_4_6_7  ))
+      
+    }else if(row$S4_div_sum_1_4_6_7 < crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
+      #S5 sig -> pair
+      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y2),tf=as.character(row$X),str=row$S5_div_sum_2_5_6_7  ))
+      
+    }else if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
+      #both sig -> triple
+      #triple_ids <- c(triple_ids,i)
+    }else{
+      #non sig -> triple
+      print("discard this triple gene combination")
+    }
+  }
+    
+}
 
+triple_df<-results[triple_ids,]
+pair_list<-pair_list[!duplicated(pair_list),]
 
+#aggregate pair_list df to get average str for each pair
+pair_list <- aggregate(pair_list[,3], list(pair_list$pw,pair_list$tf), mean)
 
-
-
-
-
-
-
-
-
+#build a network from triple gene
+sort(table(triple_df$X),decreasing = T)
 
 
 
