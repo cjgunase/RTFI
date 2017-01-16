@@ -248,4 +248,20 @@ create_empty_table <- function(num_rows, num_cols) {
   return(frame)
 }
 
+expand.grid.unique <- function(x, y, include.equals=FALSE)
+{
+  x <- unique(x)
+  
+  y <- unique(y)
+  
+  g <- function(i)
+  {
+    z <- setdiff(y, x[seq_len(i-include.equals)])
+    
+    if(length(z)) cbind(x[i], z, deparse.level=0)
+  }
+  
+  do.call(rbind, lapply(seq_along(x), g))
+}
+
 
