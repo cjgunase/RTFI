@@ -264,4 +264,32 @@ expand.grid.unique <- function(x, y, include.equals=FALSE)
   do.call(rbind, lapply(seq_along(x), g))
 }
 
+pw_1tf_2_calc <- function(vec){
+  #function to calculate 1 Pathway 2 TF relations
+  y <- discretize(pw.exp[vec$pw])
+  x1 <- discretize(tf.exp[vec$tf1])
+  x2 <- discretize(tf.exp[vec$tf2])
+  
+  S7 <- condinformation(x1, x2, method="emp") - condinformation(x1, x2,y, method="emp")
+  if(S7 <= 0) return(NULL)
+  
+  S6 <- condinformation(x1, x2, method="emp") - S7
+  if(S6 <= 0) return(NULL)
+  S5 <- condinformation(x1, y, method="emp") - S7
+  if(S5 <= 0) return(NULL)
+  S4 <- condinformation(x2, y, method="emp") - S7
+  if(S4 <= 0) return(NULL)
+  
+  S1 <- condentropy(x1,data.frame(x2,y),method="emp")
+  if(S1 <= 0) return(NULL)
+  S2 <- condentropy(x2,data.frame(x1,y),method="emp")
+  if(S2 <= 0) return(NULL)
+  S3 <- condentropy(y,data.frame(x1,x2),method="emp")
+  if(S3 <= 0) return(NULL)
+  
+  collect <-c(as.character(vec$pw),as.character(vec$tf1),as.character(vec$tf2),S1,S2,S3,S4,S5,S6,S7,S7/(S1+S2+S3))
+  
+  return(collect)
+}
+
 

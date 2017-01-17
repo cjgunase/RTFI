@@ -1,5 +1,4 @@
 #parelle implementation
-
 library(spls)
 library(plyr)
 library(foreach)
@@ -98,21 +97,23 @@ for (pw in unique(colnames(pw.exp))){
 }
 
 ############################################
+#pw_pair_tf_all<-pw_pair_tf_all[sample(1:1310478,replace = F)[1:1000],]
 
-
-expand.grid.unique <- function(x, y, include.equals=FALSE)
-{
-  x <- unique(x)
+cl<-makeCluster(8)
+registerDoParallel(cl)
+i=1
+ls<-foreach(i=1:nrow(pw_pair_tf_all),.combine =rbind,.packages=c("infotheo")) %dopar% {
+  vec<-pw_pair_tf_all[i,]
+  pw_1tf_2_calc(vec)
   
-  y <- unique(y)
-  
-  g <- function(i)
-  {
-    z <- setdiff(y, x[seq_len(i-include.equals)])
-    
-    if(length(z)) cbind(x[i], z, deparse.level=0)
-  }
-  
-  do.call(rbind, lapply(seq_along(x), g))
 }
+stopCluster(cl)
+
+write.csv(ls, "onePW_2TF_interaction.csv")
+
+
+
+  
+
+
 
