@@ -17,7 +17,7 @@ y1_y2_pair_alpha = 0.005
 file1 <- "./pathways/pws_in_stem/exp.data/At_stem_rma_july2012_AGI129_final.txt"
 #file1 <- "./pathways/pws_in_leafs/exp.data/Dataset_drought_stress_seq17_2016st_136samples.csv"
 # file 2: Pathway gene IDs
-file2 <- "pathways/pws_in_stem/lignin/lignin_pathway_genes.csv"
+file2 <- "pathways/all_pw/AT_all_pwg.csv"
 
 #file2 <- "./pathways/pws_in_leafs/anthocynin/anthocy_pathway_genes_136.csv"
 
