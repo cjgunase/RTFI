@@ -1,4 +1,3 @@
-#parelle implementation
 library(spls)
 library(plyr)
 library(foreach)
@@ -66,7 +65,7 @@ pw.exp <- within(pw.exp, rm(Gene))
 genes <- pw.exp$sym
 pw.exp <- as.data.frame(t(pw.exp[,-(sample_size+1)]))#change this
 colnames(pw.exp) <- genes
-colnames(pw.exp)
+
 
 ################################################################################
 #Dimension Reduction Step (Optional)
@@ -78,41 +77,113 @@ beta <- spls.coeff(tf.exp,pw.exp)
 #t-statisic for spls coefficients
 #boot.tstat <- coeff.boot(tf.exp,pw.exp)
 
-Selected_TF<-data.frame(sort(table(unlist(beta[1:50,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
+Selected_TF<-data.frame(sort(table(unlist(beta[1:150,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
 Selected_TF<-data.frame(Selected_TF[Selected_TF[,2]>2,])
 Selected_TF <- as.character(Selected_TF$Var1)
 #commnet this line to used Dimention reduciton
 #Selected_TF <- colnames(tf.exp)
+TF_pairs<-combn(Selected_TF,2,simplify = F)
+?combn
+################################################################################
+#CMI calculations two TF , one Pathway
+################################################################################
 
-#############################################
-#code to generate the combination grid of 2 TF and 1 PW gene
-TF_pairs_df<-data.frame(expand.grid.unique(Selected_TF,Selected_TF))#helper function expand.grid.unique is used.
-pw_pair_tf_all<-create_empty_table(0,3)
-colnames(pw_pair_tf_all)<-c("pw","tf1","tf2")
-pw.column_df<-data.frame()
-for (pw in unique(colnames(pw.exp))){
-  temp_df<-cbind(data.frame(rep(pw,dim(TF_pairs_df)[1]),TF_pairs_df))
-  colnames(temp_df)<-c("pw","tf1","tf2")
-  pw_pair_tf_all<-rbind(pw_pair_tf_all,temp_df)
+for(i in 1:length(TF_pairs)){
+  if(TF_pairs[[i]][1] == TF_pairs[[i]][2]){next}
+  y1 <- tf.exp[[TF_pairs[[i]][1]]]
+  y2 <- tf.exp[[TF_pairs[[i]][2]]]
+  for(k in colnames(pw.exp)){
+    x <- pw.exp[[k]]
+    #Mutual Information
+    y1 <- discretize(y1)
+    y2 <- discretize(y2)
+    x <- discretize(x)
+    
+    enty1 <- entropy(y1)
+    if(enty1==0) next
+    enty2 <- entropy(y2)
+    if(enty2==0) next
+    entx <- entropy(x)
+    if(entx==0) next
+    
+    enty1x <- condentropy(y1,x, method="emp")
+    if(enty1x==0) next
+    
+    enty2x <- condentropy(y2,x, method="emp")
+    if(enty2x==0) next
+    
+    enty1_y2x <- condentropy(y1,data.frame(x,y2), method="emp")
+    if(enty1_y2x==0) next
+    
+    enty2_y1x <- condentropy(y2,data.frame(x,y1), method="emp")
+    if(enty2_y1x==0) next
+    
+    entx_y1y2 <- condentropy(x,data.frame(y2,y1), method="emp")
+    if(entx_y1y2==0) next
+    
+    #calculates MI y1;y2
+    Iy1y2 <- condinformation(y1, y2, method="emp")
+    if(Iy1y2==0) next
+    
+    #calculates pvalue for MI y1;y2
+    Iy1y2_pval <- 2*pnorm(-abs(cmi.pw(y1,y2)$zvalue))
+    
+    #calculates MI y1;y2|x
+    Iy1y2_x <- condinformation(y1, y2,x, method="emp")
+    if(Iy1y2_x==0) next
+    
+    Iy1x_y2<- condinformation(y1,x,y2, method="emp")
+    if(Iy1x_y2==0) next
+    
+    Iy2x_y1 <- condinformation(y2,x,y1, method="emp")
+    if(Iy2x_y1==0) next
+    
+    Iy1y2x <- Iy1y2 - Iy1y2_x 
+    if(Iy1y2x <= 0) next
+    
+    print(paste(c(k,
+                  TF_pairs[[i]][1],
+                  TF_pairs[[i]][2],
+                  enty1,
+                  enty2,
+                  entx,
+                  enty1_y2x,
+                  enty2_y1x,
+                  entx_y1y2,
+                  Iy1x_y2,
+                  Iy2x_y1,
+                  Iy1y2_x,
+                  Iy1y2,
+                  Iy1y2_pval,
+                  Iy1y2x),
+                sep = ","
+    ))
+    
+    cat(k,
+      TF_pairs[[i]][1],
+      TF_pairs[[i]][2],
+      enty1,
+      enty2,
+      entx,
+      enty1_y2x,
+      enty2_y1x,
+      entx_y1y2,
+      Iy1x_y2,
+      Iy2x_y1,
+      Iy1y2_x,
+      Iy1y2,
+      Iy1y2_pval,
+      Iy1y2x,
+      "\n",
+      file="./TF_combination_calculations.txt",
+      sep="\t",
+      append=TRUE)
+  }
 }
 
-############################################
-#pw_pair_tf_all<-pw_pair_tf_all[sample(1:1310478,replace = F)[1:1000],]
-
-cl<-makeCluster(8)
-registerDoParallel(cl)
-ls<-foreach(i=1:nrow(pw_pair_tf_all),.combine =rbind,.packages=c("infotheo")) %dopar% {
-  vec<-pw_pair_tf_all[i,]
-  pw_1tf_2_calc(vec)
-  
-}
-stopCluster(cl)
-
-write.csv(ls, "onePW_2TF_interaction.csv")
-
-
-
-  
-
-
+install.packages("data.table")
+library(data.table)
+mydata<-fread("TF_combination_calculations.txt")
+mydata[1,]
+sort(table(mydata$V3),decreasing = T)
 

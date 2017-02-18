@@ -67,7 +67,7 @@ pw.exp <- within(pw.exp, rm(Gene))
 genes <- pw.exp$sym
 pw.exp <- as.data.frame(t(pw.exp[,-(sample_size+1)]))#change this
 colnames(pw.exp) <- genes
-colnames(pw.exp)
+#colnames(pw.exp)
 
 ################################################################################
 #Dimension Reduction Step (Optional)
@@ -84,61 +84,63 @@ colnames(pw.exp)
 #Selected_TF <- as.character(Selected_TF$Var1)
 #Selected_TF <- Selected_TF[1:5]
 #commnet this line to used Dimention reduciton
-Selected_TF <- colnames(tf.exp)
-
+Selected_TF <- colnames(tf.exp)[1:10]
+pw.exp <- pw.exp[,sample(100,replace = F)]
 #######################################################################################
 ############################################# parralel approch 1 with looped parrallel DF
 #code to generate the combination grid of 2 TF and 1 PW gene
-# pw_pair_tf_all<-create_empty_table(0,11)
-# colnames(pw_pair_tf_all)<-c("X1","X2","X3","X4","X5","X6","X7","X8","X9", "X10","X11")
-# for (tf in unique(Selected_TF)){
-#   
-#   PW_pairs_df<-data.frame(expand.grid.unique(unique(colnames(pw.exp)),unique(colnames(pw.exp))))#helper function expand.grid.unique is used.
-#   temp_df<-cbind(data.frame(PW_pairs_df,rep(tf,dim(PW_pairs_df)[1])))
-#   colnames(temp_df)<-c("pw1","pw2","tf")
-#   
-#   cl<-makeCluster(16)
-#   registerDoParallel(cl)
-#   ls<-foreach(i=1:nrow(temp_df),.combine =rbind,.packages=c("infotheo")) %dopar% {
-#     vec<-temp_df[i,]
-#     pw_2tf_1_calc(vec)
-#     
-#   }
-#   stopCluster(cl)
-#   
-#   ls <- data.frame(ls)
-#   rownames(ls)<-NULL
-#   pw_pair_tf_all <-rbind(pw_pair_tf_all,ls)
-# }
-# 
-# write.csv(pw_pair_tf_all, "PW2TF1_interaction.csv")
-
-
-#pw.exp <- pw.exp[,sample(100,replace = F)]
-############################################# parr approach 2 using data.tables########
-#code to generate the combination grid of 2 TF and 1 PW gene
 pw_pair_tf_all<-create_empty_table(0,11)
 colnames(pw_pair_tf_all)<-c("X1","X2","X3","X4","X5","X6","X7","X8","X9", "X10","X11")
-library(data.table)
-temp_df_pw_tf <-create_empty_table(0,3)
-colnames(temp_df_pw_tf)<-c("pw1","pw2","tf")
 
 for (tf in unique(Selected_TF)){
-PW_pairs_df<-data.table(expand.grid.unique(unique(colnames(pw.exp)),unique(colnames(pw.exp))))#helper function expand.grid.unique is used.
-temp_df<-cbind(data.table(PW_pairs_df,rep(tf,dim(PW_pairs_df)[1])))
-colnames(temp_df)<-c("pw1","pw2","tf")
-temp_df_pw_tf<-rbind(temp_df_pw_tf,temp_df)
-}
-
-cl<-makeCluster(8)
-registerDoParallel(cl)
-ls<-foreach(i=1:nrow(temp_df_pw_tf),.combine =rbind,.packages=c("infotheo")) %dopar% {
-  vec<-temp_df_pw_tf[i,]
-  pw_2tf_1_calc(vec)
+  tf_file_name <-paste("PWpair1TFinteraction_",tf,".csv",sep = "")
   
+  PW_pairs_df<-data.frame(expand.grid.unique(unique(colnames(pw.exp)),unique(colnames(pw.exp))))#helper function expand.grid.unique is used.
+  temp_df<-cbind(data.frame(PW_pairs_df,rep(tf,dim(PW_pairs_df)[1])))
+  colnames(temp_df)<-c("pw1","pw2","tf")
+  
+  cl<-makeCluster(8)
+  registerDoParallel(cl)
+  ls<-foreach(i=1:nrow(temp_df),.combine =rbind,.packages=c("infotheo")) %dopar% {
+    vec<-temp_df[i,]
+    pw_2tf_1_calc(vec)
+    
+  }
+  stopCluster(cl)
+  
+  ls <- data.frame(ls)
+  rownames(ls)<-NULL
+  write.csv(ls, tf_file_name)
 }
-stopCluster(cl)
 
-ls <- data.table(ls)
-rownames(ls)<-NULL
-write.csv(ls, "PW2TF1_interaction.csv")
+
+
+
+
+############################################# parr approach 2 using data.tables########
+#code to generate the combination grid of 2 TF and 1 PW gene
+# pw_pair_tf_all<-create_empty_table(0,11)
+# colnames(pw_pair_tf_all)<-c("X1","X2","X3","X4","X5","X6","X7","X8","X9", "X10","X11")
+# library(data.table)
+# temp_df_pw_tf <-create_empty_table(0,3)
+# colnames(temp_df_pw_tf)<-c("pw1","pw2","tf")
+# 
+# for (tf in unique(Selected_TF)){
+# PW_pairs_df<-data.table(expand.grid.unique(unique(colnames(pw.exp)),unique(colnames(pw.exp))))#helper function expand.grid.unique is used.
+# temp_df<-cbind(data.table(PW_pairs_df,rep(tf,dim(PW_pairs_df)[1])))
+# colnames(temp_df)<-c("pw1","pw2","tf")
+# temp_df_pw_tf<-rbind(temp_df_pw_tf,temp_df)
+# }
+# 
+# cl<-makeCluster(16)
+# registerDoParallel(cl)
+# ls<-foreach(i=1:nrow(temp_df_pw_tf),.combine =rbind,.packages=c("infotheo")) %dopar% {
+#   vec<-temp_df_pw_tf[i,]
+#   pw_2tf_1_calc(vec)
+#   
+# }
+# stopCluster(cl)
+# 
+# ls <- data.table(ls)
+# rownames(ls)<-NULL
+# write.csv(ls, "PW2TF1_interaction.csv")

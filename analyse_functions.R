@@ -292,35 +292,46 @@ pw_1tf_2_calc <- function(vec){
   return(collect)
 }
 
-pw_2tf_1_calc <- function(vec){
-  
-  #function to calculate 1 Pathway 2 TF relations
-  y1 <- discretize(pw.exp[vec$pw1])
-  y2 <- discretize(pw.exp[vec$pw2])
-  x <- discretize(tf.exp[vec$tf])
 
-  S7 <- condinformation(y1, y2, method="emp") - condinformation(y1, y2,x, method="emp")
-  if(S7 <= 0) return(NULL)
+
+
+mi3<-function(y1,y2,x){
   
-  S6 <- condinformation(y1, y2, method="emp") - S7
-  if(S6 <= 0) return(NULL)
-  S5 <- condinformation(x, y2, method="emp") - S7
-  if(S5 <= 0) return(NULL)
-  S4 <- condinformation(x, y1, method="emp") - S7
-  if(S4 <= 0) return(NULL)
+  y1<-discretize(y1)
+  y2<-discretize(y2)
+  x<-discretize(x)
   
-  S1 <- condentropy(y1,data.frame(x,y2),method="emp")
-  if(S1 <= 0) return(NULL)
-  S2 <- condentropy(y2,data.frame(x,y1),method="emp")
-  if(S2 <= 0) return(NULL)
-  S3 <- condentropy(x,data.frame(y1,y2),method="emp")
-  if(S3 <= 0) return(NULL)
+  enty1 <- entropy(y1)
   
-  collect <-c(as.character(vec$pw1),as.character(vec$pw2),as.character(vec$tf),S1,S2,S3,S4,S5,S6,S7,S7/(S1+S2+S3))
+  enty2 <- entropy(y2)
   
-  return(collect)
+  entx <- entropy(x)
+  
+  
+  enty1x <- condentropy(y1,x, method="emp")
+  
+  enty2x <- condentropy(y2,x, method="emp")
+  
+  enty1_y2x <- condentropy(y1,data.frame(x,y2), method="emp")
+  
+  enty2_y1x <- condentropy(y2,data.frame(x,y1), method="emp")
+  
+  entx_y1y2 <- condentropy(x,data.frame(y2,y1), method="emp")
+  
+  #calculates MI y1;y2
+  Iy1y2 <- condinformation(y1, y2, method="emp")
+  
+  #calculates MI y1;y2|x
+  Iy1y2_x <- condinformation(y1, y2,x, method="emp")
+  
+  Iy1x_y2<- condinformation(y1,x,y2, method="emp")
+  
+  Iy2x_y1 <- condinformation(y2,x,y1, method="emp")
+  
+  Iy1y2x <- Iy1y2 - Iy1y2_x
+  I3<-Iy1y2x/(enty1_y2x+enty2_y1x+entx_y1y2)
+  return(abs(I3))
+  
 }
-
-
 
 

@@ -3,11 +3,10 @@ library(plyr)
 library(foreach)
 library(doParallel)
 library(infotheo)
-library(mpmi)
+require(fitdistrplus)
+#library(mpmi)
 source("./load_background_data.R")
 source("./analyse_functions.R")
-
-y1_y2_pair_alpha = 0.005
 
 ################################################################################
 #Load Data and convert to data frames as samples in rows and genes in columns
@@ -17,7 +16,7 @@ file1 <- "./pathways/pws_in_stem/exp.data/At_stem_rma_july2012_AGI129_final.txt"
 #file1 <- "./pathways/pws_in_leafs/exp.data/Dataset_drought_stress_seq17_2016st_136samples.csv"
 # file 2: Pathway gene IDs
 file2 <- "./pathways/pws_in_stem/lignin/lignin_pathway_genes.csv"
-#file2 <- "./pathways/pws_in_leafs/anthocynin/anthocy_pathway_genes.csv"
+#file2 <- "./pathways/pws_in_leafs/anthocynin/anthocy_pathway_genes_136.csv"
 
 #todo:
 #extract the directory from file2 and put resutls in the same directory
@@ -43,8 +42,7 @@ colnames(AT_pwlist)<-"Gene"
 
 posTFs<-c("GATA12","LBD15","MYB103","MYB43","MYB63","SND3","MYB46","MYB61",
                "LBD30","MYB85","SND1","NST1","MYB58","NST2","SND2","GRF3","SHP1",
-               "MYB86","VND4","HB53","MYB52","XND1")
-
+               "MYB86","VND4","HB53","MYB52","XND1","MYB92")
 ##############################################################################
 
 #extract expression for the TFs
@@ -56,7 +54,7 @@ tf.exp <- within(tf.exp, rm(Gene))
 genes <- tf.exp$sym
 tf.exp <- data.frame(t(tf.exp[,-(sample_size+1)]))#change this 129 for stem 137 for leaf
 colnames(tf.exp) <- genes
-write.csv(pw.exp,"pw.lignin.csv")
+#write.csv(pw.exp,"pw.lignin.csv")
 #extract expression for the seleted pathway
 pw.exp<-merge(AT_pwlist,exp.data,by = "Gene")
 pw.exp<-data.frame(merge(pw.exp,anno,by="Gene"))
@@ -66,26 +64,39 @@ genes <- pw.exp$sym
 pw.exp <- as.data.frame(t(pw.exp[,-(sample_size+1)]))#change this
 colnames(pw.exp) <- genes
 
+###Read directly##
+pw.exp <- read.csv("./pathways/weng_ping_arabi/pathway_data_data1.csv")
+tf.exp <- read.csv("./pathways/weng_ping_arabi/tf_data_data2.csv")
 
+posTFs <- as.character(colnames(tf.exp)[1:35])
 ################################################################################
 #Dimension Reduction Step (Optional)
 ################################################################################
 
 #obtain spls coefficients
-#beta <- spls.coeff(tf.exp,pw.exp)
+beta <- spls.coeff(tf.exp,pw.exp)
 
 #t-statisic for spls coefficients
 #boot.tstat <- coeff.boot(tf.exp,pw.exp)
 
-#Selected_TF<-data.frame(sort(table(unlist(beta[1:150,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
-#Selected_TF<-data.frame(test[test[,2]>2,])
-#Selected_TF <- rownames(Selected_TF)
+Selected_TF<-data.frame(sort(table(unlist(beta[1:100,seq(1,dim(beta)[2],2)], use.names=FALSE)),decreasing = T))
+Selected_TF<-data.frame(Selected_TF[Selected_TF[,2]>2,])
+Selected_TF <- Selected_TF$Var1
 #commnet this line to used Dimention reduciton
-Selected_TF <- colnames(tf.exp)
+#Selected_TF <- colnames(tf.exp)
 
 ################################################################################
 #CMI calculations
 ################################################################################
+n=128
+
+vec<-c()
+for(i in 1:1000){
+  vec<-c(vec,mi3(runif(n),runif(n),runif(n)))
+}
+hist(vec,main="3Gene interaction for randomised data",xlab="S7/S1+S2+S3")
+fit<-fitdist(vec,"norm",method = c("mle"))
+plot(fit)
 
 count_i <-0
   for(i in 1:(dim(pw.exp)[2]-1)){
@@ -129,8 +140,7 @@ count_i <-0
         if(Iy1y2==0) next
 
         #calculates pvalue for MI y1;y2
-        Iy1y2_pval <- 2*pnorm(-abs(cmi.pw(y1,y2)$zvalue))
-        
+                
         #calculates MI y1;y2|x
         Iy1y2_x <- condinformation(y1, y2,x, method="emp")
         if(Iy1y2_x==0) next
@@ -143,6 +153,11 @@ count_i <-0
         
         Iy1y2x <- Iy1y2 - Iy1y2_x 
         if(Iy1y2x <= 0) next
+        I3<-Iy1y2x/(enty1_y2x+enty2_y1x+entx_y1y2)
+        I3 <- 0.1176310
+        z<-(I3-mean(vec))/sd(vec)
+        pnorm(z,lower.tail=FALSE)
+        I3_pval <- pnorm(z,lower.tail=FALSE)
         
         print(paste(c(colnames(pw.exp)[i],
                     colnames(pw.exp)[j],
@@ -156,9 +171,9 @@ count_i <-0
                     Iy1x_y2,
                     Iy2x_y1,
                     Iy1y2_x,
-                    Iy1y2,
-                    Iy1y2_pval,
-                    Iy1y2x),
+                    Iy1y2x,
+                    I3,
+                    I3_pval),
                     sep = ","
         ))
         
@@ -175,11 +190,11 @@ count_i <-0
 	        Iy1x_y2,
 	        Iy2x_y1,
 	        Iy1y2_x,
-	        Iy1y2,
-	        Iy1y2_pval,
 	        Iy1y2x,
+	        I3,
+	        I3_pval,
           "\n",
-          file="./all_combination_calculations.txt",
+          file="./all_combination.txt",
           sep="\t",
           append=TRUE)
       }
@@ -187,17 +202,11 @@ count_i <-0
   }
 
 ####### replace the file from the server ###############
-results <- read.csv("./SPLS_combination_calculations_stem_lignin_pw.txt",sep="\t",header = F)
-########################################################
-#correction for p_value for Iy1_y2_pval
-
-corrected.p.value<-p.adjust(results$V14, method = "BH", n = length(results$V14))
-results$V16 <- corrected.p.value
+results <- read.csv("./all_combination.txt",sep="\t",header = F)
+results$V16 <- NULL
 colnames(results)<-c("Y1","Y2","X","H_Y1","H_Y2","H_X",
-                     "S1","S2","S3","S4","S5","S6","S6_S7","S6_S7_pval","S7","S6_S7_adj.pval")
-
-colnames(results)
-
+                     "S1","S2","S3","S4","S5","S6","S7","S7_div_123","S7_div_123_pval")
+########################################################
 results$S7_div_sum_1_2_3 <- results$S7/(results$S1+results$S2+results$S3)
 hist(results$S7_div_sum_1_2_3)
 fit<-fitdist(results$S7_div_sum_1_2_3,"exp",method = c("mle"))
@@ -205,99 +214,104 @@ plot(fit)
 summary(fit)[1]
 crit_S7_div_sum_1_2_3<-qexp(0.95,summary(fit)[1]$estimate)
 
-results$S4_div_sum_1_4_6_7 <- (results$S4+results$S7)/(results$S1+results$S4+results$S6+results$S7)
-hist(results$S4_div_sum_1_4_6_7)
-fit<-fitdist(results$S4_div_sum_1_4_6_7,"lnorm",method = c("mle"))
-plot(fit)
-summary(fit)[1]
-#crit_S4_div_sum_1_4_6_7 <- qnorm(0.95,mean = summary(fit)[1]$estimate[1],sd=summary(fit)[1]$estimate[2],lower.tail = T)
-crit_S4_div_sum_1_4_6_7 <- qlnorm(0.95,meanlog = summary(fit)[1]$estimate[1],sdlog=summary(fit)[1]$estimate[2],lower.tail = T)
+results<-results[with(results, order(S7_div_123_pval)), ]
+hist(results$S7_div_123_pval)
+corr.pval<-p.adjust(results$S7_div_123_pval, method = "bonferroni", n = length(results$S7_div_123_pval))
+results$corrected.pval<-corr.pval
 
-results$S5_div_sum_2_5_6_7 <- (results$S5+results$S7)/(results$S2+results$S5+results$S6+results$S7)
-hist(results$S5_div_sum_2_5_6_7)
-fit<-fitdist(results$S5_div_sum_2_5_6_7,"lnorm",method = c("mle"))
-plot(fit)
-summary(fit)[1]
-#crit_S5_div_sum_2_5_6_7 <- qnorm(0.95,mean = summary(fit)[1]$estimate[1],sd=summary(fit)[1]$estimate[2],lower.tail = T)
-crit_S5_div_sum_2_5_6_7 <- qlnorm(0.95,meanlog = summary(fit)[1]$estimate[1],sdlog=summary(fit)[1]$estimate[2],lower.tail = T)
+selected_results <-results[results$corrected.pval < 0.05,]
+tf_freq<-data.frame(sort(table(selected_results$X),decreasing = T))
+tf_freq<-tf_freq[tf_freq$Freq>0,]
 
 
+pair_list<-rbind(data.frame(tf=selected_results$X,pw=selected_results$Y1,str=selected_results$S7_div_sum_1_2_3),
+                 data.frame(tf=selected_results$X,pw=selected_results$Y2,str=selected_results$S7_div_sum_1_2_3))
 
-triple_ids <-c()
-pair_list<- create_empty_table(0,3)
-colnames(pair_list)<-c("pw","tf","str")
-
-
-for(i in 1:dim(results)[1]){
-  
-  row <- results[i,]
-  if(row$S6_S7_adj.pval < y1_y2_pair_alpha & row$S7_div_sum_1_2_3 < crit_S7_div_sum_1_2_3){
-    
-    if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 < crit_S5_div_sum_2_5_6_7){
-      # S4 sig -> pair
-      
-      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y1),tf=as.character(row$X),str=row$S4_div_sum_1_4_6_7))
-      
-    }else if(row$S4_div_sum_1_4_6_7 < crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
-      #S5 sig -> pair
-      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y2),tf=as.character(row$X),str=row$S5_div_sum_2_5_6_7  ))
-      
-    }else if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
-      #S4 and S5 sig -> triple
-      triple_ids <- c(triple_ids,i)
-    }else{
-      # both not sig -> discard
-      print("discard this triple gene combination")
-    }
-
-  }else if(row$S6_S7_adj.pval > y1_y2_pair_alpha){# 4 cases
-    
-    if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 < crit_S5_div_sum_2_5_6_7){
-      # S4 sig -> pair
-      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y1),tf=as.character(row$X),str=row$S4_div_sum_1_4_6_7  ))
-      
-    }else if(row$S4_div_sum_1_4_6_7 < crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
-      #S5 sig -> pair
-      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y2),tf=as.character(row$X),str=row$S5_div_sum_2_5_6_7  ))
-      
-    }else if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
-      #S4 and S5 sig -> triple
-      triple_ids <- c(triple_ids,i)
-    }else{
-      # both not sig -> discard
-      print("discard this triple gene combination")
-    }
-    
-  }else if(row$S6_S7_adj.pval < y1_y2_pair_alpha & row$S7_div_sum_1_2_3 > crit_S7_div_sum_1_2_3){
-    triple_ids <- c(triple_ids,i)
-    if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 < crit_S5_div_sum_2_5_6_7){
-      #S4 sig -> pair
-      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y1),tf=as.character(row$X),str=row$S4_div_sum_1_4_6_7  ))
-      
-    }else if(row$S4_div_sum_1_4_6_7 < crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
-      #S5 sig -> pair
-      pair_list <- rbind(pair_list, data.frame(pw=as.character(row$Y2),tf=as.character(row$X),str=row$S5_div_sum_2_5_6_7  ))
-      
-    }else if(row$S4_div_sum_1_4_6_7 > crit_S4_div_sum_1_4_6_7 & row$S5_div_sum_2_5_6_7 > crit_S5_div_sum_2_5_6_7){
-      #both sig -> triple
-      #triple_ids <- c(triple_ids,i)
-    }else{
-      #non sig -> triple
-      print("discard this triple gene combination")
-    }
-  }
-    
-}
-
-triple_df<-results[triple_ids,]
-pair_list<-pair_list[!duplicated(pair_list),]
 
 #aggregate pair_list df to get average str for each pair
-pair_list <- aggregate(pair_list[,3], list(pair_list$pw,pair_list$tf), mean)
+pair_list <- aggregate(pair_list[,3], list(pair_list$tf,pair_list$pw), mean)
+colnames(pair_list) <-c("tf","pw","str")
 
-#build a network from triple gene
-sort(table(triple_df$X),decreasing = T)
 
+barplot(sort(table(as.character(pair_list$tf)),decreasing = T)[1:20],ylab="pairs frequency",xlab="",
+        las=2,ylim = c(0,25),main="Rank TFs based on Pairs Frequency")
+TF_rank_MI<-data.frame(sort(table(as.character(pair_list$tf)),decreasing = T))
+
+write.csv(pair_list,"STEM_128.csv")
+
+########### ROC evaluation ########
+
+# 3GInteraction method.
+cutoffs<-seq(1,dim(tf_freq)[1],1)
+topk<-c()
+noPos<-c()
+tpr_list<-c()
+fpr_list<-c()
+for(cutoff in cutoffs){
+  k = cutoff
+  P<-posTFs
+  N<-setdiff(tf_freq$Var1,P)
+  
+  topK<-as.character(tf_freq[,"Var1"][1:k])
+  bottomK<-as.character(tf_freq[,"Var1"][(k+1):dim(tf_freq)[1]])
+  
+  TP<-intersect(topK,P)
+  TPR<-length(TP)/length(P)
+  TN<-intersect(N,bottomK)
+  SPC<-length(TN)/length(N)
+  tpr_list<-c(tpr_list,TPR)
+  fpr_list<-c(fpr_list,1-SPC)
+}
+
+plot(fpr_list,tpr_list,type="l",col="red",
+     xlab="False Positive Rate(FPR)",ylab="True Positive Rate(TPR)",main="ROC Lignin Biosynthesis Pathway",lwd=1.5)
+
+#Embryonic Stem Cells Atlas of Pluripotency Evidence
+#Bottom up GGM Partial Correlation
+library(stats)
+library(MASS)
+sig=0.05         ## significance level to test the correlation and partial correlation , can be changed
+sig1=0.05        ## significance level to test the difference of correlations, can be changed
+sig2=0.05        ##significance level for cutt off intf_tf--------- 
+sig_diff=0.05    ## for dimention reduction, triplet with correlation difference less than diff_cutoff are discarded
+source("./pcor_func.R")
+
+
+pwg<-colnames(pw.exp)
+tfg<-as.character(Selected_TF)
+pw<-as.matrix(t(pw.exp))
+tf<-tf.exp[tfg]
+tf<-as.matrix(t(tf))
+results<-approach1(pw,tf,pwg,tfg)
+results<- results[results$regulator.no_regulator=="regulator",]
+results$tf
+TF_rank_pCor<-data.frame(sort(table(as.character(results$tf)),decreasing = T))
+
+
+TF_rank_pCor<-TF_rank_pCor[1:dim(TF_rank_MI)[1],]
+
+cutoffs<-seq(1,dim(TF_rank_pCor)[1],1)
+topk<-c()
+noPos<-c()
+tpr_list.2<-c()
+fpr_list.2<-c()
+for(cutoff in cutoffs){
+  k = cutoff
+  P<-posTFs
+  N<-setdiff(TF_rank_pCor$Var1,P)
+  
+  topK<-as.character(TF_rank_pCor[,"Var1"][1:k])
+  bottomK<-as.character(TF_rank_pCor[,"Var1"][(k+1):dim(TF_rank_pCor)[1]])
+  
+  TP<-intersect(topK,P)
+  TPR<-length(TP)/length(P)
+  TN<-intersect(N,bottomK)
+  SPC<-length(TN)/length(N)
+  tpr_list.2<-c(tpr_list.2,TPR)
+  fpr_list.2<-c(fpr_list.2,1-SPC)
+}
+lines(fpr_list.2,tpr_list.2,col="green",type = "l",lwd=1.5)
+legend(x="bottomright",c("3GMI","BottomUpGGM"),lty = c(1,1),lwd=c(2.5,2.5),col=c("red","green"))
 
 
 
